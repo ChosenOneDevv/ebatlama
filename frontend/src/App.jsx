@@ -36,6 +36,12 @@ function App() {
     setResult(null)
   }
 
+  const duplicateCut = (cut) => {
+    const newCut = { ...cut, id: Date.now() }
+    setCuts([...cuts, newCut])
+    setResult(null)
+  }
+
   const handleOptimize = async () => {
     if (cuts.length === 0) {
       setError('Lütfen en az bir kesim ekleyin')
@@ -70,6 +76,8 @@ function App() {
       await generatePDF({
         stockLength: settings.stockLength,
         kerf: settings.kerf,
+        startOffset: settings.startOffset || 0,
+        endOffset: settings.endOffset || 0,
         profile: settings.profile,
         optimizationResult: result
       })
@@ -86,6 +94,8 @@ function App() {
       await exportExcel({
         stockLength: settings.stockLength,
         kerf: settings.kerf,
+        startOffset: settings.startOffset || 0,
+        endOffset: settings.endOffset || 0,
         profile: settings.profile,
         cuts
       })
@@ -105,6 +115,8 @@ function App() {
       setSettings({
         stockLength: data.stockLength,
         kerf: data.kerf,
+        startOffset: data.startOffset || 0,
+        endOffset: data.endOffset || 0,
         profile: data.profile
       })
       setCuts(data.cuts.map((cut, index) => ({ ...cut, id: Date.now() + index })))
@@ -212,7 +224,8 @@ function App() {
               <CutList 
                 cuts={cuts} 
                 onUpdate={updateCut} 
-                onDelete={deleteCut} 
+                onDelete={deleteCut}
+                onDuplicate={duplicateCut}
               />
 
               <div className="mt-4 pt-4 border-t">

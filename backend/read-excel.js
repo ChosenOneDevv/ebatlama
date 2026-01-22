@@ -12,6 +12,8 @@ const cutsData = xlsx.utils.sheet_to_json(cutsSheet, { header: 1 });
 const settings = {
   stockLength: settingsData[1][1],
   kerf: settingsData[2][1],
+  startOffset: 50,
+  endOffset: 50,
   profile: {
     width: settingsData[3][1],
     height: settingsData[4][1]

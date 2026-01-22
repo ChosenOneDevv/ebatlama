@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 
 const defaultCut = {
+  name: '',
+  code: '',
   length: '',
   quantity: 1,
   startAngle: 90,
@@ -38,6 +40,34 @@ export default function CutForm({ onAdd }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Parça Adı
+          </label>
+          <input
+            type="text"
+            value={cut.name}
+            onChange={(e) => handleChange('name', e.target.value)}
+            placeholder="Örn: Kasa Profili"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Parça Kodu
+          </label>
+          <input
+            type="text"
+            value={cut.code}
+            onChange={(e) => handleChange('code', e.target.value)}
+            placeholder="Örn: KP-001"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -79,7 +109,7 @@ export default function CutForm({ onAdd }) {
               value={cut.startAngle}
               onChange={(e) => handleChange('startAngle', e.target.value)}
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              min="0"
+              min="-90"
               max="90"
             />
             <select
@@ -103,7 +133,7 @@ export default function CutForm({ onAdd }) {
               value={cut.endAngle}
               onChange={(e) => handleChange('endAngle', e.target.value)}
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              min="0"
+              min="-90"
               max="90"
             />
             <select

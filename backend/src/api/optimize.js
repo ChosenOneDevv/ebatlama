@@ -5,7 +5,7 @@ const router = Router();
 
 router.post('/', (req, res) => {
   try {
-    const { stockLength, kerf, profile, cuts } = req.body;
+    const { stockLength, kerf, profile, cuts, startOffset, endOffset } = req.body;
 
     if (!stockLength || !cuts || !Array.isArray(cuts)) {
       return res.status(400).json({ 
@@ -18,7 +18,9 @@ router.post('/', (req, res) => {
       stockLength: Number(stockLength),
       kerf: Number(kerf) || 3,
       profile: profile || { width: 90, height: 50 },
-      cuts
+      cuts,
+      startOffset: Number(startOffset) || 0,
+      endOffset: Number(endOffset) || 0
     });
 
     res.json(result);

@@ -7,13 +7,15 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 router.post('/export', (req, res) => {
   try {
-    const { stockLength, kerf, profile, cuts } = req.body;
+    const { stockLength, kerf, profile, cuts, startOffset, endOffset } = req.body;
 
     const excelBuffer = exportToExcel({
       stockLength,
       kerf,
       profile,
-      cuts
+      cuts,
+      startOffset: Number(startOffset) || 0,
+      endOffset: Number(endOffset) || 0
     });
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

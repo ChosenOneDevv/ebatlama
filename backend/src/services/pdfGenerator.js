@@ -113,31 +113,56 @@ function drawProfile(doc, x, y, width, height, cut, scale) {
  * Açılı kesim çizgisi çizer
  * Yatay kesim: düz çizgi
  * Dikey kesim: kesikli çizgi
+ * Negatif açı: ters yönde çizgi (paralel kesim için)
  */
 function drawAngleLine(doc, x, y, width, height, angle, plane, isStart) {
-  if (angle === 90) return;
+  if (angle === 90 || angle === -90) return;
   
   doc.save();
   
-  const angleRad = (angle * Math.PI) / 180;
+  const absAngle = Math.abs(angle);
+  const isNegative = angle < 0;
+  const angleRad = (absAngle * Math.PI) / 180;
   
   if (isStart) {
-    doc.moveTo(x, y);
-    if (plane === 'V') {
-      const offset = height / Math.tan(angleRad);
-      doc.lineTo(x + Math.min(offset, width * 0.3), y + height);
+    if (isNegative) {
+      doc.moveTo(x, y + height);
+      if (plane === 'V') {
+        const offset = height / Math.tan(angleRad);
+        doc.lineTo(x + Math.min(offset, width * 0.3), y);
+      } else {
+        const offset = width * 0.15;
+        doc.lineTo(x + offset, y);
+      }
     } else {
-      const offset = width * 0.15;
-      doc.lineTo(x + offset, y + height);
+      doc.moveTo(x, y);
+      if (plane === 'V') {
+        const offset = height / Math.tan(angleRad);
+        doc.lineTo(x + Math.min(offset, width * 0.3), y + height);
+      } else {
+        const offset = width * 0.15;
+        doc.lineTo(x + offset, y + height);
+      }
     }
   } else {
-    doc.moveTo(x + width, y);
-    if (plane === 'V') {
-      const offset = height / Math.tan(angleRad);
-      doc.lineTo(x + width - Math.min(offset, width * 0.3), y + height);
+    if (isNegative) {
+      doc.moveTo(x + width, y + height);
+      if (plane === 'V') {
+        const offset = height / Math.tan(angleRad);
+        doc.lineTo(x + width - Math.min(offset, width * 0.3), y);
+      } else {
+        const offset = width * 0.15;
+        doc.lineTo(x + width - offset, y);
+      }
     } else {
-      const offset = width * 0.15;
-      doc.lineTo(x + width - offset, y + height);
+      doc.moveTo(x + width, y);
+      if (plane === 'V') {
+        const offset = height / Math.tan(angleRad);
+        doc.lineTo(x + width - Math.min(offset, width * 0.3), y + height);
+      } else {
+        const offset = width * 0.15;
+        doc.lineTo(x + width - offset, y + height);
+      }
     }
   }
   
@@ -201,16 +226,17 @@ function drawSawIcon(doc, x, y, isVertical) {
 }
 
 /**
- * Açı metnini formatlar - 90° için "Düz" yazar
+ * Açı metnini formatlar - 90° için "Düz" yazar, negatif açılar için işaret gösterir
  */
 function formatAngleText(angle) {
-  return angle === 90 ? 'Düz' : `${angle}°`;
+  if (angle === 90 || angle === -90) return 'Düz';
+  return `${angle}°`;
 }
 
 /**
  * Stok profilini ve kesimlerini çizer
  */
-function drawStock(doc, stock, startY, pageWidth, profile, stockLength, kerf, stockCount = 1) {
+function drawStock(doc, stock, startY, pageWidth, profile, stockLength, kerf, stockCount = 1, startOffset = 0, endOffset = 0) {
   const margin = 50;
   const availableWidth = pageWidth - (margin * 2);
   const scale = availableWidth / stockLength;
@@ -239,9 +265,16 @@ function drawStock(doc, stock, startY, pageWidth, profile, stockLength, kerf, st
      .stroke('#999');
   
   doc.fontSize(7).fillColor('#666');
-  doc.text(`${profileWidth}`, margin - 18, stockY + profileHeight / 2 - 4);
+  doc.text(`${profileWidth}mm`, margin - 22, stockY + profileHeight / 2 - 4);
   
   let currentX = margin;
+  
+  if (startOffset > 0) {
+    const offsetWidth = startOffset * scale;
+    doc.rect(currentX, stockY, offsetWidth, profileHeight)
+       .fillAndStroke('#ffe0b2', '#ff9800');
+    currentX += offsetWidth;
+  }
   
   stock.cuts.forEach((cut, index) => {
     const cutWidth = cut.effectiveLength * scale;
@@ -274,11 +307,16 @@ function drawStock(doc, stock, startY, pageWidth, profile, stockLength, kerf, st
       doc.text(lengthLabel, currentX + (cutWidth - labelWidth) / 2, stockY + profileHeight / 2 - 5);
       doc.font('Roboto');
       
-      doc.fontSize(6).fillColor('#555');
+      doc.fontSize(6);
       const startNote = cut.startPlane === 'V' ? 'Dikey' : 'Yatay';
       const endNote = cut.endPlane === 'V' ? 'Dikey' : 'Yatay';
+      const startNoteWidth = doc.widthOfString(startNote);
+      const endNoteWidth = doc.widthOfString(endNote);
+      doc.rect(currentX + padding - 1, stockY + profileHeight - 13, startNoteWidth + 2, 10).fill('#fff');
+      doc.rect(currentX + cutWidth - padding - endNoteWidth - 1, stockY + profileHeight - 13, endNoteWidth + 2, 10).fill('#fff');
+      doc.fillColor('#555');
       doc.text(startNote, currentX + padding, stockY + profileHeight - 12);
-      doc.text(endNote, currentX + cutWidth - padding - 24, stockY + profileHeight - 12);
+      doc.text(endNote, currentX + cutWidth - padding - endNoteWidth, stockY + profileHeight - 12);
       
     } else if (cutWidth > 55) {
       drawSawIcon(doc, currentX + 6, stockY + 5, cut.startPlane === 'V');
@@ -306,11 +344,11 @@ function drawStock(doc, stock, startY, pageWidth, profile, stockLength, kerf, st
       doc.font('Roboto');
       
     } else {
-      doc.fontSize(6).fillColor('#000');
-      const labelWidth = doc.widthOfString(lengthLabel);
-      if (cutWidth > labelWidth + 4) {
-        doc.text(lengthLabel, currentX + (cutWidth - labelWidth) / 2, stockY + profileHeight / 2 - 3);
-      }
+      doc.fontSize(7).font('Roboto-Bold').fillColor('#000');
+      const indexLabel = `${index + 1}`;
+      const indexWidth = doc.widthOfString(indexLabel);
+      doc.text(indexLabel, currentX + (cutWidth - indexWidth) / 2, stockY + profileHeight / 2 - 4);
+      doc.font('Roboto');
     }
     
     currentX += cutWidth;
@@ -339,19 +377,40 @@ function drawStock(doc, stock, startY, pageWidth, profile, stockLength, kerf, st
          .fontSize(7)
          .text('Fire', currentX + wasteWidth / 2 - 10, stockY + profileHeight / 2 - 4);
     }
+    currentX += wasteWidth;
+  }
+  
+  if (endOffset > 0) {
+    const offsetWidth = endOffset * scale;
+    doc.rect(currentX, stockY, offsetWidth, profileHeight)
+       .fillAndStroke('#ffe0b2', '#ff9800');
   }
   
   return stockY + profileHeight + 8;
 }
 
 /**
- * Stok için kesim tablosu çizer
+ * Stok için kesim tablosu çizer - aynı parçaları gruplar ve adet gösterir
  */
 function drawStockTable(doc, stock, startY, pageWidth) {
   const margin = 50;
-  const colWidths = [30, 70, 60, 60, 80];
-  const headers = ['#', 'Uzunluk', 'Baş Kesim', 'Son Kesim', 'Notlar'];
+  const colWidths = [25, 65, 50, 50, 30, 45, 45, 65];
+  const headers = ['#', 'Parça Adı', 'Kod', 'Uzunluk', 'Adet', 'Baş', 'Son', 'Not'];
   const tableWidth = colWidths.reduce((a, b) => a + b, 0);
+  
+  const groupedCuts = [];
+  const cutMap = new Map();
+  
+  stock.cuts.forEach((cut, index) => {
+    const key = `${cut.length}-${cut.startAngle}-${cut.startPlane}-${cut.endAngle}-${cut.endPlane}-${cut.name || ''}-${cut.code || ''}`;
+    if (cutMap.has(key)) {
+      cutMap.get(key).count++;
+    } else {
+      const groupedCut = { ...cut, count: 1, displayIndex: index + 1 };
+      cutMap.set(key, groupedCut);
+      groupedCuts.push(groupedCut);
+    }
+  });
   
   let y = startY;
   
@@ -367,7 +426,7 @@ function drawStockTable(doc, stock, startY, pageWidth) {
   
   y += 12;
   
-  stock.cuts.forEach((cut, index) => {
+  groupedCuts.forEach((cut, index) => {
     x = margin;
     doc.fontSize(7).fillColor('#000');
     
@@ -377,20 +436,29 @@ function drawStockTable(doc, stock, startY, pageWidth) {
     doc.text(`${index + 1}`, x + 2, y + 2, { width: colWidths[0] - 4 });
     x += colWidths[0];
     
-    doc.text(`${cut.length} mm`, x + 2, y + 2, { width: colWidths[1] - 4 });
+    doc.text(cut.name || '-', x + 2, y + 2, { width: colWidths[1] - 4 });
     x += colWidths[1];
     
-    const startAngle = Number(cut.startAngle) || 90;
-    const startPlane = cut.startPlane === 'V' ? 'Dikey' : 'Yatay';
-    doc.text(`${startPlane} ${startAngle}°`, x + 2, y + 2, { width: colWidths[2] - 4 });
+    doc.text(cut.code || '-', x + 2, y + 2, { width: colWidths[2] - 4 });
     x += colWidths[2];
     
-    const endAngle = Number(cut.endAngle) || 90;
-    const endPlane = cut.endPlane === 'V' ? 'Dikey' : 'Yatay';
-    doc.text(`${endPlane} ${endAngle}°`, x + 2, y + 2, { width: colWidths[3] - 4 });
+    doc.text(`${cut.length}mm`, x + 2, y + 2, { width: colWidths[3] - 4 });
     x += colWidths[3];
     
-    doc.text(cut.notes || '-', x + 2, y + 2, { width: colWidths[4] - 4 });
+    doc.text(`${cut.count}`, x + 2, y + 2, { width: colWidths[4] - 4 });
+    x += colWidths[4];
+    
+    const startAngle = Number(cut.startAngle) || 90;
+    const startText = startAngle === 90 ? 'Düz' : `${cut.startPlane === 'V' ? 'D' : 'Y'}${startAngle}°`;
+    doc.text(startText, x + 2, y + 2, { width: colWidths[5] - 4 });
+    x += colWidths[5];
+    
+    const endAngle = Number(cut.endAngle) || 90;
+    const endText = endAngle === 90 ? 'Düz' : `${cut.endPlane === 'V' ? 'D' : 'Y'}${endAngle}°`;
+    doc.text(endText, x + 2, y + 2, { width: colWidths[6] - 4 });
+    x += colWidths[6];
+    
+    doc.text(cut.notes || '-', x + 2, y + 2, { width: colWidths[7] - 4 });
     
     y += rowHeight;
   });
@@ -403,8 +471,8 @@ function drawStockTable(doc, stock, startY, pageWidth) {
  */
 function drawCutList(doc, cuts, startY, pageWidth) {
   const margin = 50;
-  const colWidths = [40, 80, 50, 80, 80, 80];
-  const headers = ['#', 'Uzunluk', 'Adet', 'Baş Açı', 'Son Açı', 'Notlar'];
+  const colWidths = [25, 70, 55, 55, 35, 50, 50, 70];
+  const headers = ['#', 'Parça Adı', 'Kod', 'Uzunluk', 'Adet', 'Baş', 'Son', 'Not'];
   
   doc.fontSize(11)
      .fillColor('#000')
@@ -430,21 +498,29 @@ function drawCutList(doc, cuts, startY, pageWidth) {
     doc.text(`${index + 1}`, x, y, { width: colWidths[0] });
     x += colWidths[0];
     
-    doc.text(`${cut.length} mm`, x, y, { width: colWidths[1] });
+    doc.text(cut.name || '-', x, y, { width: colWidths[1] });
     x += colWidths[1];
     
-    doc.text(`${cut.quantity || 1}`, x, y, { width: colWidths[2] });
+    doc.text(cut.code || '-', x, y, { width: colWidths[2] });
     x += colWidths[2];
     
-    const startAngle = formatAngle(cut.startAngle || 90, cut.startPlane || 'V');
-    doc.text(startAngle || '90°', x, y, { width: colWidths[3] });
+    doc.text(`${cut.length}mm`, x, y, { width: colWidths[3] });
     x += colWidths[3];
     
-    const endAngle = formatAngle(cut.endAngle || 90, cut.endPlane || 'V');
-    doc.text(endAngle || '90°', x, y, { width: colWidths[4] });
+    doc.text(`${cut.quantity || 1}`, x, y, { width: colWidths[4] });
     x += colWidths[4];
     
-    doc.text(cut.notes || '-', x, y, { width: colWidths[5] });
+    const startAngle = Number(cut.startAngle) || 90;
+    const startText = startAngle === 90 ? 'Düz' : `${cut.startPlane === 'V' ? 'D' : 'Y'}${startAngle}°`;
+    doc.text(startText, x, y, { width: colWidths[5] });
+    x += colWidths[5];
+    
+    const endAngle = Number(cut.endAngle) || 90;
+    const endText = endAngle === 90 ? 'Düz' : `${cut.endPlane === 'V' ? 'D' : 'Y'}${endAngle}°`;
+    doc.text(endText, x, y, { width: colWidths[6] });
+    x += colWidths[6];
+    
+    doc.text(cut.notes || '-', x, y, { width: colWidths[7] });
     
     y += 15;
   });
@@ -455,7 +531,7 @@ function drawCutList(doc, cuts, startY, pageWidth) {
 /**
  * PDF oluşturur
  */
-export async function generatePDF({ stockLength, kerf, profile, stocks, summary }) {
+export async function generatePDF({ stockLength, kerf, profile, stocks, summary, startOffset = 0, endOffset = 0 }) {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ 
@@ -524,7 +600,7 @@ export async function generatePDF({ stockLength, kerf, profile, stocks, summary 
           currentY = 50;
         }
         
-        currentY = drawStock(doc, stock, currentY, pageWidth, profile, stockLength, kerf, stockCount);
+        currentY = drawStock(doc, stock, currentY, pageWidth, profile, stockLength, kerf, stockCount, startOffset, endOffset);
         
         currentY = drawStockTable(doc, stock, currentY, pageWidth);
         

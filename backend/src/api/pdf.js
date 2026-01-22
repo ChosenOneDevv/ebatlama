@@ -5,7 +5,7 @@ const router = Router();
 
 router.post('/', async (req, res) => {
   try {
-    const { stockLength, kerf, profile, optimizationResult } = req.body;
+    const { stockLength, kerf, profile, optimizationResult, startOffset, endOffset } = req.body;
 
     if (!optimizationResult || !optimizationResult.stocks) {
       return res.status(400).json({ 
@@ -19,7 +19,9 @@ router.post('/', async (req, res) => {
       kerf: Number(kerf) || 3,
       profile: profile || { width: 90, height: 50 },
       stocks: optimizationResult.stocks,
-      summary: optimizationResult.summary
+      summary: optimizationResult.summary,
+      startOffset: Number(startOffset) || 0,
+      endOffset: Number(endOffset) || 0
     });
 
     res.setHeader('Content-Type', 'application/pdf');
