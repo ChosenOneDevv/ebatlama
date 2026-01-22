@@ -1,4 +1,39 @@
 import PDFDocument from 'pdfkit';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const FONT_PATH = path.join(__dirname, '../fonts/Roboto-Regular.ttf');
+const FONT_BOLD_PATH = path.join(__dirname, '../fonts/Roboto-Bold.ttf');
+
+/**
+ * Aynı kesim düzenine sahip stokları gruplar
+ */
+function groupIdenticalStocks(stocks) {
+  const groups = [];
+  
+  for (const stock of stocks) {
+    const signature = stock.cuts.map(cut => 
+      `${cut.length}-${cut.startAngle}-${cut.startPlane}-${cut.endAngle}-${cut.endPlane}`
+    ).join('|');
+    
+    const existingGroup = groups.find(g => g.signature === signature);
+    
+    if (existingGroup) {
+      existingGroup.count++;
+    } else {
+      groups.push({
+        signature,
+        stock: { ...stock, stockIndex: groups.length + 1 },
+        count: 1
+      });
+    }
+  }
+  
+  return groups;
+}
 
 /**
  * Açı notasyonunu oluşturur
@@ -75,84 +110,292 @@ function drawProfile(doc, x, y, width, height, cut, scale) {
 }
 
 /**
+ * Açılı kesim çizgisi çizer
+ * Yatay kesim: düz çizgi
+ * Dikey kesim: kesikli çizgi
+ */
+function drawAngleLine(doc, x, y, width, height, angle, plane, isStart) {
+  if (angle === 90) return;
+  
+  doc.save();
+  
+  const angleRad = (angle * Math.PI) / 180;
+  
+  if (isStart) {
+    doc.moveTo(x, y);
+    if (plane === 'V') {
+      const offset = height / Math.tan(angleRad);
+      doc.lineTo(x + Math.min(offset, width * 0.3), y + height);
+    } else {
+      const offset = width * 0.15;
+      doc.lineTo(x + offset, y + height);
+    }
+  } else {
+    doc.moveTo(x + width, y);
+    if (plane === 'V') {
+      const offset = height / Math.tan(angleRad);
+      doc.lineTo(x + width - Math.min(offset, width * 0.3), y + height);
+    } else {
+      const offset = width * 0.15;
+      doc.lineTo(x + width - offset, y + height);
+    }
+  }
+  
+  doc.lineWidth(2);
+  
+  if (plane === 'V') {
+    doc.dash(3, { space: 2 });
+    doc.strokeColor('#c0392b');
+  } else {
+    doc.strokeColor('#2980b9');
+  }
+  
+  doc.stroke();
+  doc.undash();
+  
+  doc.restore();
+}
+
+/**
+ * Taralı desen çizer (fire için)
+ */
+function drawHatchPattern(doc, x, y, width, height) {
+  doc.save();
+  doc.rect(x, y, width, height).clip();
+  
+  doc.lineWidth(0.5).strokeColor('#999');
+  
+  const spacing = 4;
+  for (let i = -height; i < width + height; i += spacing) {
+    doc.moveTo(x + i, y)
+       .lineTo(x + i + height, y + height)
+       .stroke();
+  }
+  
+  doc.restore();
+}
+
+/**
+ * Testere yönü ikonu çizer
+ * Dikey: ║║ (dikey çizgiler - testereye dik)
+ * Yatay: ═ (yatay çizgiler - testereye paralel)
+ */
+function drawSawIcon(doc, x, y, isVertical) {
+  doc.save();
+  
+  doc.rect(x - 1, y - 1, 12, 12).fill('#fff');
+  
+  doc.lineWidth(1.5);
+  
+  if (isVertical) {
+    doc.strokeColor('#c0392b');
+    doc.moveTo(x + 2, y + 1).lineTo(x + 2, y + 9).stroke();
+    doc.moveTo(x + 6, y + 1).lineTo(x + 6, y + 9).stroke();
+  } else {
+    doc.strokeColor('#2980b9');
+    doc.moveTo(x + 1, y + 3).lineTo(x + 9, y + 3).stroke();
+    doc.moveTo(x + 1, y + 7).lineTo(x + 9, y + 7).stroke();
+  }
+  
+  doc.restore();
+}
+
+/**
+ * Açı metnini formatlar - 90° için "Düz" yazar
+ */
+function formatAngleText(angle) {
+  return angle === 90 ? 'Düz' : `${angle}°`;
+}
+
+/**
  * Stok profilini ve kesimlerini çizer
  */
-function drawStock(doc, stock, startY, pageWidth, profile, stockLength, kerf) {
+function drawStock(doc, stock, startY, pageWidth, profile, stockLength, kerf, stockCount = 1) {
   const margin = 50;
   const availableWidth = pageWidth - (margin * 2);
   const scale = availableWidth / stockLength;
   const profileHeight = 40;
   
+  const profileWidth = profile?.width || 60;
+  
   doc.fontSize(11)
      .fillColor('#000')
      .text(`Stok #${stock.stockIndex}`, margin, startY);
+  
+  doc.fontSize(9)
+     .fillColor('#2980b9')
+     .text(`(${stockCount} adet)`, margin + 60, startY + 1);
   
   doc.fontSize(8)
      .fillColor('#666')
      .text(
        `Kullanılan: ${stock.usedLength}mm | Fire: ${stock.wasteLength}mm | Verim: %${stock.efficiency}`,
-       margin + 80, startY + 2
+       margin + 120, startY + 2
      );
   
-  const stockY = startY + 20;
+  const stockY = startY + 18;
   
   doc.rect(margin, stockY, availableWidth, profileHeight)
-     .fillAndStroke('#f5f5f5', '#ccc');
+     .stroke('#999');
+  
+  doc.fontSize(7).fillColor('#666');
+  doc.text(`${profileWidth}`, margin - 18, stockY + profileHeight / 2 - 4);
   
   let currentX = margin;
   
   stock.cuts.forEach((cut, index) => {
     const cutWidth = cut.effectiveLength * scale;
     
-    const colors = ['#3498db', '#2ecc71', '#e74c3c', '#f39c12', '#9b59b6', '#1abc9c'];
-    const color = colors[cut.originalIndex % colors.length];
-    
     doc.rect(currentX, stockY, cutWidth, profileHeight)
-       .fillAndStroke(color, '#333');
+       .fillAndStroke('#fff', '#333');
     
-    doc.fillColor('#fff')
-       .fontSize(8);
+    const startAngle = Number(cut.startAngle) || 90;
+    const endAngle = Number(cut.endAngle) || 90;
     
-    const label = `${cut.length}mm`;
-    const labelWidth = doc.widthOfString(label);
+    drawAngleLine(doc, currentX, stockY, cutWidth, profileHeight, startAngle, cut.startPlane, true);
+    drawAngleLine(doc, currentX, stockY, cutWidth, profileHeight, endAngle, cut.endPlane, false);
     
-    if (cutWidth > labelWidth + 4) {
-      doc.text(label, currentX + (cutWidth - labelWidth) / 2, stockY + profileHeight / 2 - 4);
-    }
+    const lengthLabel = `${cut.length}mm`;
+    const padding = 8;
     
-    const startAngleText = formatAngle(cut.startAngle, cut.startPlane);
-    const endAngleText = formatAngle(cut.endAngle, cut.endPlane);
+    const startAngleText = formatAngleText(startAngle);
+    const endAngleText = formatAngleText(endAngle);
     
-    doc.fontSize(6).fillColor('#333');
-    
-    if (startAngleText) {
-      doc.text(startAngleText, currentX + 2, stockY + profileHeight + 3);
-    }
-    
-    if (endAngleText) {
-      doc.text(endAngleText, currentX + cutWidth - 20, stockY + profileHeight + 3);
+    if (cutWidth > 90) {
+      drawSawIcon(doc, currentX + padding, stockY + padding, cut.startPlane === 'V');
+      doc.fillColor('#000').fontSize(7);
+      doc.text(startAngleText, currentX + padding + 14, stockY + padding + 1);
+      
+      drawSawIcon(doc, currentX + cutWidth - padding - 12, stockY + padding, cut.endPlane === 'V');
+      doc.text(endAngleText, currentX + cutWidth - padding - 32, stockY + padding + 1, { width: 18, align: 'right' });
+      
+      doc.fontSize(9).font('Roboto-Bold').fillColor('#000');
+      const labelWidth = doc.widthOfString(lengthLabel);
+      doc.text(lengthLabel, currentX + (cutWidth - labelWidth) / 2, stockY + profileHeight / 2 - 5);
+      doc.font('Roboto');
+      
+      doc.fontSize(6).fillColor('#555');
+      const startNote = cut.startPlane === 'V' ? 'Dikey' : 'Yatay';
+      const endNote = cut.endPlane === 'V' ? 'Dikey' : 'Yatay';
+      doc.text(startNote, currentX + padding, stockY + profileHeight - 12);
+      doc.text(endNote, currentX + cutWidth - padding - 24, stockY + profileHeight - 12);
+      
+    } else if (cutWidth > 55) {
+      drawSawIcon(doc, currentX + 6, stockY + 5, cut.startPlane === 'V');
+      doc.fillColor('#000').fontSize(6);
+      doc.text(startAngleText, currentX + 18, stockY + 7);
+      
+      drawSawIcon(doc, currentX + cutWidth - 16, stockY + 5, cut.endPlane === 'V');
+      doc.text(endAngleText, currentX + cutWidth - 32, stockY + 7);
+      
+      doc.fontSize(8).font('Roboto-Bold').fillColor('#000');
+      const labelWidth = doc.widthOfString(lengthLabel);
+      doc.text(lengthLabel, currentX + (cutWidth - labelWidth) / 2, stockY + profileHeight / 2 - 3);
+      doc.font('Roboto');
+      
+    } else if (cutWidth > 35) {
+      doc.fillColor('#000').fontSize(6);
+      const startIcon = cut.startPlane === 'V' ? '║' : '═';
+      const endIcon = cut.endPlane === 'V' ? '║' : '═';
+      doc.text(`${startIcon}${startAngleText}`, currentX + 4, stockY + 6);
+      doc.text(`${endIcon}${endAngleText}`, currentX + cutWidth - 26, stockY + 6);
+      
+      doc.fontSize(7).font('Roboto-Bold');
+      const labelWidth = doc.widthOfString(lengthLabel);
+      doc.text(lengthLabel, currentX + (cutWidth - labelWidth) / 2, stockY + profileHeight / 2);
+      doc.font('Roboto');
+      
+    } else {
+      doc.fontSize(6).fillColor('#000');
+      const labelWidth = doc.widthOfString(lengthLabel);
+      if (cutWidth > labelWidth + 4) {
+        doc.text(lengthLabel, currentX + (cutWidth - labelWidth) / 2, stockY + profileHeight / 2 - 3);
+      }
     }
     
     currentX += cutWidth;
     
     if (index < stock.cuts.length - 1) {
-      doc.rect(currentX, stockY, kerf * scale, profileHeight)
-         .fillAndStroke('#ff6b6b', '#c0392b');
-      currentX += kerf * scale;
+      const kerfWidth = kerf * scale;
+      doc.rect(currentX, stockY, kerfWidth, profileHeight)
+         .fillAndStroke('#ddd', '#999');
+      currentX += kerfWidth;
     }
   });
   
   if (stock.wasteLength > 0) {
     const wasteWidth = stock.wasteLength * scale;
-    doc.rect(currentX, stockY, wasteWidth, profileHeight)
-       .fillAndStroke('#ecf0f1', '#bdc3c7');
     
-    doc.fillColor('#7f8c8d')
-       .fontSize(7)
-       .text('Fire', currentX + wasteWidth / 2 - 10, stockY + profileHeight / 2 - 4);
+    doc.rect(currentX, stockY, wasteWidth, profileHeight)
+       .stroke('#999');
+    
+    drawHatchPattern(doc, currentX, stockY, wasteWidth, profileHeight);
+    
+    doc.rect(currentX, stockY, wasteWidth, profileHeight)
+       .stroke('#999');
+    
+    if (wasteWidth > 25) {
+      doc.fillColor('#666')
+         .fontSize(7)
+         .text('Fire', currentX + wasteWidth / 2 - 10, stockY + profileHeight / 2 - 4);
+    }
   }
   
-  return stockY + profileHeight + 25;
+  return stockY + profileHeight + 8;
+}
+
+/**
+ * Stok için kesim tablosu çizer
+ */
+function drawStockTable(doc, stock, startY, pageWidth) {
+  const margin = 50;
+  const colWidths = [30, 70, 60, 60, 80];
+  const headers = ['#', 'Uzunluk', 'Baş Kesim', 'Son Kesim', 'Notlar'];
+  const tableWidth = colWidths.reduce((a, b) => a + b, 0);
+  
+  let y = startY;
+  
+  doc.fontSize(7).fillColor('#333');
+  let x = margin;
+  
+  doc.rect(margin, y, tableWidth, 12).fillAndStroke('#f0f0f0', '#ccc');
+  
+  headers.forEach((header, i) => {
+    doc.fillColor('#333').text(header, x + 2, y + 3, { width: colWidths[i] - 4, align: 'left' });
+    x += colWidths[i];
+  });
+  
+  y += 12;
+  
+  stock.cuts.forEach((cut, index) => {
+    x = margin;
+    doc.fontSize(7).fillColor('#000');
+    
+    const rowHeight = 11;
+    doc.rect(margin, y, tableWidth, rowHeight).stroke('#ddd');
+    
+    doc.text(`${index + 1}`, x + 2, y + 2, { width: colWidths[0] - 4 });
+    x += colWidths[0];
+    
+    doc.text(`${cut.length} mm`, x + 2, y + 2, { width: colWidths[1] - 4 });
+    x += colWidths[1];
+    
+    const startAngle = Number(cut.startAngle) || 90;
+    const startPlane = cut.startPlane === 'V' ? 'Dikey' : 'Yatay';
+    doc.text(`${startPlane} ${startAngle}°`, x + 2, y + 2, { width: colWidths[2] - 4 });
+    x += colWidths[2];
+    
+    const endAngle = Number(cut.endAngle) || 90;
+    const endPlane = cut.endPlane === 'V' ? 'Dikey' : 'Yatay';
+    doc.text(`${endPlane} ${endAngle}°`, x + 2, y + 2, { width: colWidths[3] - 4 });
+    x += colWidths[3];
+    
+    doc.text(cut.notes || '-', x + 2, y + 2, { width: colWidths[4] - 4 });
+    
+    y += rowHeight;
+  });
+  
+  return y + 5;
 }
 
 /**
@@ -221,6 +464,10 @@ export async function generatePDF({ stockLength, kerf, profile, stocks, summary 
         bufferPages: true
       });
       
+      doc.registerFont('Roboto', FONT_PATH);
+      doc.registerFont('Roboto-Bold', FONT_BOLD_PATH);
+      doc.font('Roboto');
+      
       const chunks = [];
       doc.on('data', chunk => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -228,9 +475,12 @@ export async function generatePDF({ stockLength, kerf, profile, stocks, summary 
       
       const pageWidth = doc.page.width;
       
-      doc.fontSize(18)
+      doc.font('Roboto-Bold')
+         .fontSize(18)
          .fillColor('#2c3e50')
          .text('Profil Kesim Planı', 50, 50);
+      
+      doc.font('Roboto');
       
       doc.fontSize(10)
          .fillColor('#7f8c8d')
@@ -262,13 +512,23 @@ export async function generatePDF({ stockLength, kerf, profile, stocks, summary 
       let currentY = 210;
       const maxY = doc.page.height - 100;
       
-      for (const stock of stocks) {
-        if (currentY > maxY) {
+      const groupedStocks = groupIdenticalStocks(stocks);
+      
+      for (const group of groupedStocks) {
+        const stock = group.stock;
+        const stockCount = group.count;
+        const estimatedHeight = 40 + 8 + 12 + (stock.cuts.length * 11) + 15;
+        
+        if (currentY + estimatedHeight > maxY) {
           doc.addPage();
           currentY = 50;
         }
         
-        currentY = drawStock(doc, stock, currentY, pageWidth, profile, stockLength, kerf);
+        currentY = drawStock(doc, stock, currentY, pageWidth, profile, stockLength, kerf, stockCount);
+        
+        currentY = drawStockTable(doc, stock, currentY, pageWidth);
+        
+        currentY += 10;
       }
       
       doc.end();

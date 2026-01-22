@@ -4,16 +4,111 @@ function formatAngle(angle, plane) {
   return `${planeLabel}-${angle}°`
 }
 
-function StockVisual({ stock, stockLength }) {
-  const scale = 100 / stockLength
+function getPlaneLabel(plane) {
+  return plane === 'V' ? 'Dikey' : 'Yatay'
+}
+
+function AngleIndicator({ angle, plane, position }) {
+  if (angle === 90) return null
   
+  const isLeft = position === 'left'
+  const skewAngle = isLeft ? (90 - angle) : -(90 - angle)
+  
+  return (
+    <div 
+      className={`absolute top-0 h-full w-3 ${isLeft ? 'left-0' : 'right-0'}`}
+      style={{
+        background: `linear-gradient(${isLeft ? '' : '-'}${90 - angle}deg, transparent 50%, rgba(0,0,0,0.3) 50%)`,
+      }}
+    >
+      <div 
+        className={`absolute ${isLeft ? '-left-1' : '-right-1'} -top-4 text-[9px] font-bold whitespace-nowrap`}
+        style={{ color: plane === 'V' ? '#dc2626' : '#2563eb' }}
+      >
+        {formatAngle(angle, plane)}
+      </div>
+    </div>
+  )
+}
+
+function CutBar({ cut, width, left, colorClass, stockLength }) {
+  const startAngle = Number(cut.startAngle) || 90
+  const endAngle = Number(cut.endAngle) || 90
+  const hasStartAngle = startAngle !== 90
+  const hasEndAngle = endAngle !== 90
+
+  const clipPath = (() => {
+    if (!hasStartAngle && !hasEndAngle) return 'none'
+    
+    const startOffset = hasStartAngle ? 15 : 0
+    const endOffset = hasEndAngle ? 15 : 0
+    
+    if (hasStartAngle && hasEndAngle) {
+      return `polygon(${startOffset}% 0%, 100% 0%, ${100 - endOffset}% 100%, 0% 100%)`
+    } else if (hasStartAngle) {
+      return `polygon(${startOffset}% 0%, 100% 0%, 100% 100%, 0% 100%)`
+    } else if (hasEndAngle) {
+      return `polygon(0% 0%, 100% 0%, ${100 - endOffset}% 100%, 0% 100%)`
+    }
+    return 'none'
+  })()
+
+  const startPlaneLabel = cut.startPlane === 'V' ? 'Dikey' : 'Yatay'
+  const endPlaneLabel = cut.endPlane === 'V' ? 'Dikey' : 'Yatay'
+
+  return (
+    <div
+      className={`absolute top-0 h-full ${colorClass} flex items-center justify-center text-white text-xs font-medium overflow-visible`}
+      style={{ 
+        left: `${left}%`, 
+        width: `${width}%`,
+        clipPath: clipPath
+      }}
+      title={`${cut.length}mm - Baş: ${startPlaneLabel} ${startAngle}° / Son: ${endPlaneLabel} ${endAngle}°${cut.flipped ? ' (Ters)' : ''}`}
+    >
+      <div className="flex flex-col items-center leading-tight">
+        {width > 8 && <span className="font-bold">{cut.length}</span>}
+      </div>
+      
+      <div 
+        className="absolute left-1 -top-5 text-[8px] font-bold flex flex-col items-start"
+        style={{ color: cut.startPlane === 'V' ? '#fca5a5' : '#93c5fd' }}
+      >
+        <span>{startPlaneLabel}</span>
+        <span>{startAngle}°</span>
+      </div>
+      
+      <div 
+        className="absolute right-1 -top-5 text-[8px] font-bold flex flex-col items-end"
+        style={{ color: cut.endPlane === 'V' ? '#fca5a5' : '#93c5fd' }}
+      >
+        <span>{endPlaneLabel}</span>
+        <span>{endAngle}°</span>
+      </div>
+      
+      {cut.flipped && (
+        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[8px] text-orange-400 font-medium">
+          ↔ Ters
+        </div>
+      )}
+      
+      {cut.matchedWithPrevious && (
+        <div className="absolute -bottom-4 left-0 text-[8px] text-green-400 font-medium">
+          ✓
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StockVisual({ stock, stockLength }) {
   const colors = [
     'bg-blue-500', 'bg-green-500', 'bg-red-500', 
     'bg-yellow-500', 'bg-purple-500', 'bg-teal-500'
   ]
 
   return (
-    <div className="mb-4">
+    <div className="mb-6">
       <div className="flex items-center justify-between mb-2">
         <span className="font-medium text-gray-700">Stok #{stock.stockIndex}</span>
         <span className="text-sm text-gray-500">
@@ -24,27 +119,27 @@ function StockVisual({ stock, stockLength }) {
         </span>
       </div>
       
-      <div className="relative h-10 bg-gray-200 rounded-lg overflow-hidden">
+      <div className="relative h-12 bg-gray-200 rounded-lg overflow-visible mt-6 mb-6">
         {stock.cuts.map((cut, index) => {
           const width = (cut.effectiveLength / stockLength) * 100
           const left = (cut.startPosition / stockLength) * 100
           const colorClass = colors[cut.originalIndex % colors.length]
           
           return (
-            <div
+            <CutBar
               key={index}
-              className={`absolute top-0 h-full ${colorClass} flex items-center justify-center text-white text-xs font-medium border-r border-white/30`}
-              style={{ left: `${left}%`, width: `${width}%` }}
-              title={`${cut.length}mm - ${formatAngle(cut.startAngle, cut.startPlane) || '90°'} / ${formatAngle(cut.endAngle, cut.endPlane) || '90°'}`}
-            >
-              {width > 8 && <span>{cut.length}</span>}
-            </div>
+              cut={cut}
+              width={width}
+              left={left}
+              colorClass={colorClass}
+              stockLength={stockLength}
+            />
           )
         })}
         
         {stock.wasteLength > 0 && (
           <div
-            className="absolute top-0 h-full bg-gray-300 flex items-center justify-center text-gray-500 text-xs"
+            className="absolute top-0 h-full bg-gray-300 flex items-center justify-center text-gray-500 text-xs rounded-r-lg"
             style={{ 
               right: 0, 
               width: `${(stock.wasteLength / stockLength) * 100}%` 
@@ -55,23 +150,24 @@ function StockVisual({ stock, stockLength }) {
         )}
       </div>
       
-      <div className="flex flex-wrap gap-1 mt-2">
+      <div className="flex flex-wrap gap-1 mt-4">
         {stock.cuts.map((cut, index) => {
           const colorClass = colors[cut.originalIndex % colors.length].replace('bg-', 'text-')
-          const startAngle = formatAngle(cut.startAngle, cut.startPlane)
-          const endAngle = formatAngle(cut.endAngle, cut.endPlane)
+          const startPlane = cut.startPlane === 'V' ? 'D' : 'Y'
+          const endPlane = cut.endPlane === 'V' ? 'D' : 'Y'
+          const startAngle = cut.startAngle || 90
+          const endAngle = cut.endAngle || 90
           
           return (
             <span 
               key={index} 
-              className={`text-xs ${colorClass} bg-gray-100 px-1.5 py-0.5 rounded`}
+              className={`text-xs ${colorClass} bg-gray-100 px-1.5 py-0.5 rounded flex items-center gap-1`}
             >
-              {cut.length}mm
-              {(startAngle || endAngle) && (
-                <span className="text-gray-400 ml-1">
-                  ({startAngle || '90°'}/{endAngle || '90°'})
-                </span>
-              )}
+              <span className="font-medium">{cut.length}mm</span>
+              <span className="text-gray-400">
+                [{startPlane}{startAngle}° → {endPlane}{endAngle}°]
+              </span>
+              {cut.flipped && <span className="text-orange-500">↔</span>}
             </span>
           )
         })}

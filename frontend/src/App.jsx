@@ -10,6 +10,8 @@ function App() {
   const [settings, setSettings] = useState({
     stockLength: 6000,
     kerf: 3,
+    startOffset: 0,
+    endOffset: 0,
     profile: { width: 90, height: 50 }
   })
   
@@ -47,6 +49,8 @@ function App() {
       const data = await optimizeCuts({
         stockLength: settings.stockLength,
         kerf: settings.kerf,
+        startOffset: settings.startOffset || 0,
+        endOffset: settings.endOffset || 0,
         profile: settings.profile,
         cuts
       })

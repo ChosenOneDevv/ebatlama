@@ -70,40 +70,212 @@ function expandCuts(cuts, profile) {
 }
 
 /**
- * First Fit Decreasing (FFD) algoritması
+ * İki kesimin açılarının uyumlu olup olmadığını kontrol eder
+ * Uyumlu açılar yan yana geldiğinde yapışık görünür (kerf hariç)
+ * Koşul: Aynı düzlem + açıların toplamı 90° olmalı
+ */
+function canMatchAngles(cut1End, cut2Start) {
+  const angle1 = Number(cut1End.endAngle) || 90;
+  const angle2 = Number(cut2Start.startAngle) || 90;
+  const plane1 = cut1End.endPlane;
+  const plane2 = cut2Start.startPlane;
+  
+  // İki açı da 90° ise zaten düz kesim, özel eşleşme yok
+  if (angle1 === 90 && angle2 === 90) return false;
+  
+  // Düzlemler aynı olmalı
+  if (plane1 !== plane2) return false;
+  
+  // Açıların toplamı 90° olmalı (örn: 45+45, 30+60, 20+70)
+  return (angle1 + angle2) === 90;
+}
+
+/**
+ * Kesimi ters çevirir (baş ve son açıları değiştirir)
+ */
+function flipCut(cut) {
+  return {
+    ...cut,
+    startAngle: cut.endAngle,
+    endAngle: cut.startAngle,
+    startPlane: cut.endPlane,
+    endPlane: cut.startPlane,
+    flipped: !cut.flipped
+  };
+}
+
+/**
+ * Kesimin simetrik olup olmadığını kontrol eder
+ * Simetrik: Baş ve son açılar/yönler aynı ise
+ */
+function isSymmetricCut(cut) {
+  const startAngle = Number(cut.startAngle) || 90;
+  const endAngle = Number(cut.endAngle) || 90;
+  return startAngle === endAngle && cut.startPlane === cut.endPlane;
+}
+
+/**
+ * Simetrik kesim için en uygun yönü belirler
+ * Önceki kesimin son açısına göre döndürülüp döndürülmeyeceğine karar verir
+ */
+function orientSymmetricCut(cut, previousCut) {
+  if (!isSymmetricCut(cut)) return cut;
+  if (!previousCut) return cut;
+  
+  const prevEndAngle = Number(previousCut.endAngle) || 90;
+  const prevEndPlane = previousCut.endPlane;
+  const cutAngle = Number(cut.startAngle) || 90;
+  const cutPlane = cut.startPlane;
+  
+  if (prevEndPlane === cutPlane && (prevEndAngle + cutAngle) === 90) {
+    return { ...cut, matchedWithPrevious: true };
+  }
+  
+  return cut;
+}
+
+/**
+ * First Fit Decreasing (FFD) algoritması - Açı eşleşmesi öncelikli
  */
 function firstFitDecreasing(cuts, stockLength, kerf) {
   const sortedCuts = [...cuts].sort((a, b) => b.effectiveLength - a.effectiveLength);
   
   const stocks = [];
+  const remainingCuts = [...sortedCuts];
   
-  for (const cut of sortedCuts) {
-    let placed = false;
+  while (remainingCuts.length > 0) {
+    const cut = remainingCuts.shift();
     
+    let placed = false;
+    let bestStock = null;
+    let bestCut = cut;
+    let bestRequiredSpace = Infinity;
+    let bestIsMatched = false;
+    
+    // Mevcut stoklarda uygun yer ara
     for (const stock of stocks) {
-      const requiredSpace = cut.effectiveLength + (stock.cuts.length > 0 ? kerf : 0);
+      if (stock.cuts.length === 0) continue;
       
-      if (stock.remainingLength >= requiredSpace) {
-        stock.cuts.push(cut);
-        stock.usedLength += requiredSpace;
-        stock.remainingLength -= requiredSpace;
-        placed = true;
-        break;
+      const lastCut = stock.cuts[stock.cuts.length - 1];
+      const flippedCut = flipCut(cut);
+      
+      // Öncelik 1: Açı eşleşmesi (kerf tasarrufu)
+      if (canMatchAngles(lastCut, cut)) {
+        const matchedRequired = cut.effectiveLength;
+        if (stock.remainingLength >= matchedRequired) {
+          if (!bestIsMatched || matchedRequired < bestRequiredSpace) {
+            bestStock = stock;
+            bestCut = { ...cut, matchedWithPrevious: true };
+            bestRequiredSpace = matchedRequired;
+            bestIsMatched = true;
+            placed = true;
+          }
+        }
+      }
+      
+      if (canMatchAngles(lastCut, flippedCut)) {
+        const matchedRequired = flippedCut.effectiveLength;
+        if (stock.remainingLength >= matchedRequired) {
+          if (!bestIsMatched || matchedRequired < bestRequiredSpace) {
+            bestStock = stock;
+            bestCut = { ...flippedCut, matchedWithPrevious: true };
+            bestRequiredSpace = matchedRequired;
+            bestIsMatched = true;
+            placed = true;
+          }
+        }
+      }
+      
+      // Öncelik 2: Normal yerleştirme (eşleşme yoksa)
+      if (!bestIsMatched) {
+        const normalRequired = cut.effectiveLength + kerf;
+        if (stock.remainingLength >= normalRequired && normalRequired < bestRequiredSpace) {
+          bestStock = stock;
+          bestCut = cut;
+          bestRequiredSpace = normalRequired;
+          placed = true;
+        }
+        
+        const flippedRequired = flippedCut.effectiveLength + kerf;
+        if (stock.remainingLength >= flippedRequired && flippedRequired < bestRequiredSpace) {
+          bestStock = stock;
+          bestCut = flippedCut;
+          bestRequiredSpace = flippedRequired;
+          placed = true;
+        }
       }
     }
     
-    if (!placed) {
-      stocks.push({
-        stockIndex: stocks.length,
-        cuts: [cut],
-        usedLength: cut.effectiveLength,
-        remainingLength: stockLength - cut.effectiveLength,
-        stockLength
-      });
+    if (placed && bestStock) {
+      bestStock.cuts.push(bestCut);
+      bestStock.usedLength += bestRequiredSpace;
+      bestStock.remainingLength -= bestRequiredSpace;
+      
+      // Her zaman eşleşen kesim ara (zincirleme eşleşme için)
+      tryAddMatchingCuts(remainingCuts, bestStock, kerf);
+    } else {
+      // Yeni stok aç
+      const requiredSpace = cut.effectiveLength;
+      if (stockLength >= requiredSpace) {
+        const newStock = {
+          stockIndex: stocks.length,
+          cuts: [cut],
+          usedLength: requiredSpace,
+          remainingLength: stockLength - requiredSpace,
+          stockLength
+        };
+        stocks.push(newStock);
+        
+        // Yeni stokta eşleşen kesim var mı kontrol et (ilk kesimden sonra da)
+        tryAddMatchingCuts(remainingCuts, newStock, kerf);
+      }
     }
   }
   
   return stocks;
+}
+
+/**
+ * Stoka eşleşen kesimleri eklemeye çalışır
+ */
+function tryAddMatchingCuts(remainingCuts, stock, kerf) {
+  let addedAny = true;
+  
+  while (addedAny && remainingCuts.length > 0) {
+    addedAny = false;
+    const lastCut = stock.cuts[stock.cuts.length - 1];
+    
+    for (let i = 0; i < remainingCuts.length; i++) {
+      const candidate = remainingCuts[i];
+      const flippedCandidate = flipCut(candidate);
+      
+      // Normal yönde eşleşme
+      if (canMatchAngles(lastCut, candidate)) {
+        const required = candidate.effectiveLength;
+        if (stock.remainingLength >= required) {
+          stock.cuts.push({ ...candidate, matchedWithPrevious: true });
+          stock.usedLength += required;
+          stock.remainingLength -= required;
+          remainingCuts.splice(i, 1);
+          addedAny = true;
+          break;
+        }
+      }
+      
+      // Ters yönde eşleşme
+      if (canMatchAngles(lastCut, flippedCandidate)) {
+        const required = flippedCandidate.effectiveLength;
+        if (stock.remainingLength >= required) {
+          stock.cuts.push({ ...flippedCandidate, matchedWithPrevious: true });
+          stock.usedLength += required;
+          stock.remainingLength -= required;
+          remainingCuts.splice(i, 1);
+          addedAny = true;
+          break;
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -163,7 +335,7 @@ function formatResults(stocks, stockLength) {
 /**
  * Ana optimizasyon fonksiyonu
  */
-export function optimizeCuts({ stockLength, kerf, profile, cuts }) {
+export function optimizeCuts({ stockLength, kerf, profile, cuts, startOffset = 0, endOffset = 0 }) {
   if (!cuts || cuts.length === 0) {
     return {
       stocks: [],
@@ -177,20 +349,24 @@ export function optimizeCuts({ stockLength, kerf, profile, cuts }) {
     };
   }
   
+  const effectiveStockLength = stockLength - startOffset - endOffset;
+  
   const expandedCuts = expandCuts(cuts, profile);
   
   for (const cut of expandedCuts) {
-    if (cut.effectiveLength > stockLength) {
+    if (cut.effectiveLength > effectiveStockLength) {
       throw new Error(
-        `Kesim uzunluğu (${cut.effectiveLength}mm) stok uzunluğundan (${stockLength}mm) büyük olamaz`
+        `Kesim uzunluğu (${cut.effectiveLength}mm) kullanılabilir stok uzunluğundan (${effectiveStockLength}mm) büyük olamaz`
       );
     }
   }
   
-  const stocks = firstFitDecreasing(expandedCuts, stockLength, kerf);
+  const stocks = firstFitDecreasing(expandedCuts, effectiveStockLength, kerf);
   
   stocks.forEach(stock => {
     stock.kerf = kerf;
+    stock.startOffset = startOffset;
+    stock.endOffset = endOffset;
   });
   
   return formatResults(stocks, stockLength);

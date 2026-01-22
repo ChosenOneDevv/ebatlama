@@ -31,7 +31,7 @@ export default function SettingsPanel({ settings, onChange, onClose }) {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Stok Uzunluğu (mm)
@@ -56,6 +56,32 @@ export default function SettingsPanel({ settings, onChange, onClose }) {
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             min="0"
             step="0.5"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Baştan Pay (mm)
+          </label>
+          <input
+            type="number"
+            value={settings.startOffset || 0}
+            onChange={(e) => handleChange('startOffset', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            min="0"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Sondan Pay (mm)
+          </label>
+          <input
+            type="number"
+            value={settings.endOffset || 0}
+            onChange={(e) => handleChange('endOffset', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            min="0"
           />
         </div>
 
