@@ -1,7 +1,7 @@
 {
-  "name": "ebatlama-backend",
+  "name": "turnest-backend",
   "version": "1.0.0",
-  "description": "Profil Kesim Optimizasyonu API",
+  "description": "TurNest - 1D Cutting Stock Optimization API",
   "main": "src/index.js",
   "type": "module",
   "scripts": {

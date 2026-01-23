@@ -142,7 +142,7 @@ function App() {
                 </svg>
               </div>
               <div>
-                <h1 className="text-xl font-bold">Ebatlama</h1>
+                <h1 className="text-xl font-bold">TurNest</h1>
                 <p className="text-blue-100 text-sm">Profil Kesim Optimizasyonu</p>
               </div>
             </div>

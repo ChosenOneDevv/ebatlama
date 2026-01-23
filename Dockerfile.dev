@@ -1,0 +1,26 @@
+# Development Dockerfile
+FROM node:20-slim
+
+# Install system dependencies for PDFKit
+RUN apt-get update && apt-get install -y \
+    libfontconfig1 \
+    fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy package files
+COPY frontend/package*.json ./frontend/
+COPY backend/package*.json ./backend/
+
+# Install dependencies
+RUN cd frontend && npm install
+RUN cd backend && npm install
+
+# Copy source files
+COPY frontend ./frontend
+COPY backend ./backend
+
+EXPOSE 5173 3001
+
+CMD ["sh", "-c", "cd /app/backend && npm run dev & cd /app/frontend && npm run dev -- --host"]

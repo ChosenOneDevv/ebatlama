@@ -1,3 +1,4 @@
+# TurNest - 1D Cutting Stock Optimization
 # Stage 1: Build Frontend
 FROM node:20-slim AS frontend-builder
 
@@ -44,6 +45,12 @@ ENV PORT=3000
 
 # Expose port
 EXPOSE 3000
+
+# Labels for Docker Hub
+LABEL org.opencontainers.image.title="TurNest"
+LABEL org.opencontainers.image.description="1D Cutting Stock Optimization for aluminum and steel profiles"
+LABEL org.opencontainers.image.source="https://github.com/ChosenOneDevv/turnest"
+LABEL org.opencontainers.image.licenses="MIT"
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

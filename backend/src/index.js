@@ -24,7 +24,7 @@ app.use('/api/pdf', pdfRoutes);
 app.use('/api/excel', excelRoutes);
 
 if (process.env.NODE_ENV === 'production') {
-  const staticPath = path.join(__dirname, '../../public');
+  const staticPath = path.join(__dirname, '../public');
   app.use(express.static(staticPath));
   
   app.get('*', (req, res) => {
@@ -38,5 +38,5 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Ebatlama API çalışıyor: http://localhost:${PORT}`);
+  console.log(`TurNest API çalışıyor: http://localhost:${PORT}`);
 });
