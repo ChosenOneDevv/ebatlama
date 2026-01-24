@@ -1,8 +1,11 @@
 # TurNest - Nixpacks Configuration
 # For deployment on Railway, Render, and other Nixpacks-compatible platforms
 
+# Force Node.js provider
+providers = ["node"]
+
 [phases.setup]
-nixPkgs = ["nodejs_20", "npm"]
+nixPkgs = ["nodejs_20"]
 
 [phases.install]
 cmds = [
@@ -18,7 +21,7 @@ cmds = [
 ]
 
 [start]
-cmd = "cd backend && node src/index.js"
+cmd = "node backend/src/index.js"
 
 [variables]
 NODE_ENV = "production"
