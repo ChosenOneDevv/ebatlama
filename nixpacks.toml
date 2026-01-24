@@ -1,0 +1,25 @@
+# TurNest - Nixpacks Configuration
+# For deployment on Railway, Render, and other Nixpacks-compatible platforms
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm"]
+
+[phases.install]
+cmds = [
+    "cd frontend && npm ci",
+    "cd backend && npm ci --only=production"
+]
+
+[phases.build]
+cmds = [
+    "cd frontend && npm run build",
+    "mkdir -p backend/public",
+    "cp -r frontend/dist/* backend/public/"
+]
+
+[start]
+cmd = "cd backend && node src/index.js"
+
+[variables]
+NODE_ENV = "production"
+PORT = "3000"
