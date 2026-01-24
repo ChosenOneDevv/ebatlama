@@ -5,12 +5,14 @@ import { fileURLToPath } from 'url';
 import optimizeRoutes from './api/optimize.js';
 import pdfRoutes from './api/pdf.js';
 import excelRoutes from './api/excel.js';
+import materialsRoutes from './api/materials.js';
+import projectsRoutes from './api/projects.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || (process.env.NODE_ENV === 'production' ? 3000 : 3001);
 
 app.use(cors());
 app.use(express.json());
@@ -22,6 +24,8 @@ app.get('/api/health', (req, res) => {
 app.use('/api/optimize', optimizeRoutes);
 app.use('/api/pdf', pdfRoutes);
 app.use('/api/excel', excelRoutes);
+app.use('/api/materials', materialsRoutes);
+app.use('/api/projects', projectsRoutes);
 
 if (process.env.NODE_ENV === 'production') {
   const staticPath = path.join(__dirname, '../public');

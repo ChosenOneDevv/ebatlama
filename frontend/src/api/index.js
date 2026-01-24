@@ -51,3 +51,47 @@ export async function importExcel(file) {
   
   return response.data
 }
+
+// ============ MATERIALS ============
+
+export async function getMaterials() {
+  const response = await axios.get(`${API_BASE}/materials`)
+  return response.data
+}
+
+export async function addMaterial(material) {
+  const response = await axios.post(`${API_BASE}/materials`, material)
+  return response.data
+}
+
+export async function updateMaterial(id, material) {
+  const response = await axios.put(`${API_BASE}/materials/${id}`, material)
+  return response.data
+}
+
+export async function deleteMaterial(id) {
+  const response = await axios.delete(`${API_BASE}/materials/${id}`)
+  return response.data
+}
+
+// ============ PROJECTS ============
+
+export async function getProjects() {
+  const response = await axios.get(`${API_BASE}/projects`)
+  return response.data
+}
+
+export async function getProject(id) {
+  const response = await axios.get(`${API_BASE}/projects/${id}`)
+  return response.data
+}
+
+export async function saveProject(project) {
+  const response = await axios.post(`${API_BASE}/projects`, project)
+  return response.data
+}
+
+export async function deleteProject(id) {
+  const response = await axios.delete(`${API_BASE}/projects/${id}`)
+  return response.data
+}

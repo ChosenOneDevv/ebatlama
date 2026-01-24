@@ -1,10 +1,14 @@
-import { useState } from 'react'
-import { Settings, Plus, Trash2, Play, FileDown, FileUp, FileText } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Settings, Play, FileDown, FileUp, FileText, Save, FolderOpen, Edit2, X } from 'lucide-react'
 import CutForm from './components/CutForm'
 import CutList from './components/CutList'
 import ResultView from './components/ResultView'
 import SettingsPanel from './components/SettingsPanel'
-import { optimizeCuts, generatePDF, exportExcel, importExcel } from './api'
+import { 
+  optimizeCuts, generatePDF, exportExcel, importExcel,
+  getMaterials, saveProject, getProjects, deleteProject,
+  addMaterial as apiAddMaterial, updateMaterial as apiUpdateMaterial, deleteMaterial as apiDeleteMaterial
+} from './api'
 
 function App() {
   const [settings, setSettings] = useState({
@@ -12,7 +16,7 @@ function App() {
     kerf: 3,
     startOffset: 0,
     endOffset: 0,
-    profile: { width: 90, height: 50 }
+    profile: { width: 60, height: 30 }
   })
   
   const [cuts, setCuts] = useState([])
@@ -20,6 +24,124 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
+  
+  // Project management
+  const [projectName, setProjectName] = useState('Yeni Proje')
+  const [projectId, setProjectId] = useState(null)
+  const [editingProjectName, setEditingProjectName] = useState(false)
+  const [showProjectsModal, setShowProjectsModal] = useState(false)
+  const [projects, setProjects] = useState([])
+  
+  // Materials
+  const [materials, setMaterials] = useState([])
+
+  // Load materials on mount
+  useEffect(() => {
+    loadMaterials()
+  }, [])
+
+  const loadMaterials = async () => {
+    try {
+      const data = await getMaterials()
+      setMaterials(data)
+    } catch (err) {
+      console.error('Malzemeler yüklenemedi:', err)
+    }
+  }
+
+  const loadProjects = async () => {
+    try {
+      const data = await getProjects()
+      setProjects(data)
+    } catch (err) {
+      console.error('Projeler yüklenemedi:', err)
+    }
+  }
+
+  const handleSaveProject = async () => {
+    setLoading(true)
+    try {
+      const project = await saveProject({
+        id: projectId,
+        name: projectName,
+        settings,
+        cuts,
+        result
+      })
+      setProjectId(project.id)
+      setError(null)
+      alert('Proje kaydedildi!')
+    } catch (err) {
+      setError('Proje kaydedilemedi: ' + err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLoadProject = (project) => {
+    setProjectId(project.id)
+    setProjectName(project.name)
+    setSettings(project.settings)
+    setCuts(project.cuts.map((cut, i) => ({ ...cut, id: cut.id || Date.now() + i })))
+    setResult(project.result || null)
+    setShowProjectsModal(false)
+  }
+
+  const handleDeleteProject = async (id) => {
+    if (!confirm('Bu projeyi silmek istediğinizden emin misiniz?')) return
+    try {
+      await deleteProject(id)
+      loadProjects()
+    } catch (err) {
+      setError('Proje silinemedi: ' + err.message)
+    }
+  }
+
+  const handleNewProject = () => {
+    setProjectId(null)
+    setProjectName('Yeni Proje')
+    setCuts([])
+    setResult(null)
+    setSettings({
+      stockLength: 6000,
+      kerf: 3,
+      startOffset: 0,
+      endOffset: 0,
+      profile: { width: 60, height: 30 }
+    })
+  }
+
+  const handleMaterialsChange = async (newMaterials) => {
+    // Sync with backend
+    try {
+      // Get current materials from backend
+      const currentMaterials = await getMaterials()
+      const currentIds = currentMaterials.map(m => m.id)
+      const newIds = newMaterials.map(m => m.id)
+      
+      // Delete removed materials
+      for (const mat of currentMaterials) {
+        if (!newIds.includes(mat.id)) {
+          await apiDeleteMaterial(mat.id)
+        }
+      }
+      
+      // Add or update materials
+      for (const mat of newMaterials) {
+        if (currentIds.includes(mat.id)) {
+          await apiUpdateMaterial(mat.id, mat)
+        } else {
+          await apiAddMaterial(mat)
+        }
+      }
+      
+      // Reload materials
+      await loadMaterials()
+    } catch (err) {
+      console.error('Malzemeler kaydedilemedi:', err)
+      setError('Malzemeler kaydedilemedi')
+    }
+  }
 
   const addCut = (cut) => {
     setCuts([...cuts, { ...cut, id: Date.now() }])
@@ -143,20 +265,109 @@ function App() {
               </div>
               <div>
                 <h1 className="text-xl font-bold">TurNest</h1>
-                <p className="text-blue-100 text-sm">Profil Kesim Optimizasyonu</p>
+                {/* Project Name */}
+                <div className="flex items-center gap-2">
+                  {editingProjectName ? (
+                    <input
+                      type="text"
+                      value={projectName}
+                      onChange={(e) => setProjectName(e.target.value)}
+                      onBlur={() => setEditingProjectName(false)}
+                      onKeyDown={(e) => e.key === 'Enter' && setEditingProjectName(false)}
+                      className="bg-white/20 text-white text-sm px-2 py-0.5 rounded border-none outline-none"
+                      autoFocus
+                    />
+                  ) : (
+                    <span 
+                      className="text-blue-100 text-sm cursor-pointer hover:text-white flex items-center gap-1"
+                      onClick={() => setEditingProjectName(true)}
+                    >
+                      {projectName}
+                      <Edit2 className="w-3 h-3" />
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             
-            <button
-              onClick={() => setShowSettings(!showSettings)}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-              title="Ayarlar"
-            >
-              <Settings className="w-6 h-6" />
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Project Actions */}
+              <button
+                onClick={handleNewProject}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors text-sm"
+                title="Yeni Proje"
+              >
+                Yeni
+              </button>
+              <button
+                onClick={() => { loadProjects(); setShowProjectsModal(true) }}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                title="Projeleri Aç"
+              >
+                <FolderOpen className="w-5 h-5" />
+              </button>
+              <button
+                onClick={handleSaveProject}
+                disabled={loading}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                title="Projeyi Kaydet"
+              >
+                <Save className="w-5 h-5" />
+              </button>
+              <div className="w-px h-6 bg-white/20 mx-1" />
+              <button
+                onClick={() => setShowSettings(true)}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                title="Ayarlar"
+              >
+                <Settings className="w-6 h-6" />
+              </button>
+            </div>
           </div>
         </div>
       </header>
+
+      {/* Projects Modal */}
+      {showProjectsModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[70vh] overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b bg-gray-50">
+              <h2 className="text-lg font-bold text-gray-800">Kayıtlı Projeler</h2>
+              <button onClick={() => setShowProjectsModal(false)} className="p-2 hover:bg-gray-200 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[50vh]">
+              {projects.length === 0 ? (
+                <p className="text-center text-gray-400 py-8">Henüz kayıtlı proje yok</p>
+              ) : (
+                <div className="space-y-2">
+                  {projects.map((project) => (
+                    <div 
+                      key={project.id}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer"
+                      onClick={() => handleLoadProject(project)}
+                    >
+                      <div>
+                        <div className="font-medium text-gray-800">{project.name}</div>
+                        <div className="text-xs text-gray-500">
+                          {project.cuts?.length || 0} kesim • {new Date(project.updatedAt || project.createdAt).toLocaleDateString('tr-TR')}
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteProject(project.id) }}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-7xl mx-auto px-4 py-6">
         {error && (
@@ -171,13 +382,15 @@ function App() {
           </div>
         )}
 
-        {showSettings && (
-          <SettingsPanel 
-            settings={settings} 
-            onChange={setSettings}
-            onClose={() => setShowSettings(false)}
-          />
-        )}
+        {/* Settings Modal */}
+        <SettingsPanel 
+          isOpen={showSettings}
+          settings={settings} 
+          materials={materials}
+          onChange={setSettings}
+          onClose={() => setShowSettings(false)}
+          onMaterialsChange={handleMaterialsChange}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-6">
@@ -208,7 +421,7 @@ function App() {
                 </div>
               </div>
               
-              <CutForm onAdd={addCut} />
+              <CutForm onAdd={addCut} materials={materials} />
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -292,7 +505,7 @@ function App() {
 
       <footer className="mt-12 py-6 border-t bg-white">
         <div className="max-w-7xl mx-auto px-4 text-center text-gray-500 text-sm">
-          Ebatlama - Profil Kesim Optimizasyonu © 2026
+          TurNest - Profil Kesim Optimizasyonu © 2026
         </div>
       </footer>
     </div>

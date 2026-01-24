@@ -50,6 +50,16 @@ function CutRow({ cut, index, onUpdate, onDelete, onDuplicate, isEditing, onStar
       <tr className="bg-blue-50">
         <td className="px-3 py-2 text-center text-gray-500 text-sm">{index + 1}</td>
         <td className="px-2 py-2">
+          {cut.materialColor ? (
+            <span 
+              className="inline-block w-3 h-3 rounded-full"
+              style={{ backgroundColor: cut.materialColor }}
+            />
+          ) : (
+            <span className="text-gray-300 text-xs">-</span>
+          )}
+        </td>
+        <td className="px-2 py-2">
           <input
             type="text"
             value={editData.name || ''}
@@ -148,6 +158,17 @@ function CutRow({ cut, index, onUpdate, onDelete, onDuplicate, isEditing, onStar
   return (
     <tr className="hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0">
       <td className="px-3 py-2.5 text-center text-gray-400 text-sm font-medium">{index + 1}</td>
+      <td className="px-3 py-2.5">
+        {cut.materialColor ? (
+          <span 
+            className="inline-block w-3 h-3 rounded-full"
+            style={{ backgroundColor: cut.materialColor }}
+            title={cut.materialName || 'Malzeme'}
+          />
+        ) : (
+          <span className="text-gray-300 text-xs">-</span>
+        )}
+      </td>
       <td className="px-3 py-2.5 text-gray-800 text-sm max-w-[100px] truncate" title={cut.name}>
         {cut.name || '-'}
       </td>
@@ -230,6 +251,7 @@ export default function CutList({ cuts, onUpdate, onDelete, onDuplicate }) {
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
               <th className="px-3 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-10">#</th>
+              <th className="px-3 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-8" title="Malzeme">M</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Ad</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Kod</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Uzunluk</th>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Package } from 'lucide-react'
 
 const defaultCut = {
   name: '',
@@ -10,10 +10,11 @@ const defaultCut = {
   startPlane: 'V',
   endAngle: 90,
   endPlane: 'V',
-  notes: ''
+  notes: '',
+  materialId: ''
 }
 
-export default function CutForm({ onAdd }) {
+export default function CutForm({ onAdd, materials = [] }) {
   const [cut, setCut] = useState(defaultCut)
 
   const handleSubmit = (e) => {
@@ -23,12 +24,17 @@ export default function CutForm({ onAdd }) {
       return
     }
     
+    const material = materials.find(m => m.id === cut.materialId)
+    
     onAdd({
       ...cut,
       length: Number(cut.length),
       quantity: Number(cut.quantity) || 1,
       startAngle: Number(cut.startAngle),
-      endAngle: Number(cut.endAngle)
+      endAngle: Number(cut.endAngle),
+      materialId: cut.materialId || null,
+      materialName: material?.name || null,
+      materialColor: material?.color || null
     })
     
     setCut(defaultCut)
@@ -38,8 +44,57 @@ export default function CutForm({ onAdd }) {
     setCut(prev => ({ ...prev, [field]: value }))
   }
 
+  const selectedMaterial = materials.find(m => m.id === cut.materialId)
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Malzeme Seçimi */}
+      {materials.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            <Package className="w-4 h-4 inline mr-1" />
+            Malzeme Seçimi
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => handleChange('materialId', '')}
+              className={`px-3 py-1.5 rounded-lg border text-sm transition-colors ${
+                !cut.materialId
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 hover:border-gray-300 text-gray-600'
+              }`}
+            >
+              Genel
+            </button>
+            {materials.map((material) => (
+              <button
+                key={material.id}
+                type="button"
+                onClick={() => handleChange('materialId', material.id)}
+                className={`px-3 py-1.5 rounded-lg border text-sm transition-colors flex items-center gap-1.5 ${
+                  cut.materialId === material.id
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                }`}
+              >
+                <span 
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{ backgroundColor: material.color }}
+                />
+                {material.name}
+                <span className="text-gray-400 text-xs">({material.width}x{material.height})</span>
+              </button>
+            ))}
+          </div>
+          {selectedMaterial && (
+            <p className="mt-1 text-xs text-gray-500">
+              Seçili: {selectedMaterial.name} - Stok: {selectedMaterial.stockLength}mm
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">

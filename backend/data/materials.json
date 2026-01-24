@@ -1,0 +1,49 @@
+{
+  "materials": [
+    {
+      "id": "mat_001",
+      "name": "60x30 Kutu Profil",
+      "code": "KP-6030",
+      "width": 60,
+      "height": 30,
+      "stockLength": 6000,
+      "color": "#3b82f6"
+    },
+    {
+      "id": "mat_002",
+      "name": "80x40 Kutu Profil",
+      "code": "KP-8040",
+      "width": 80,
+      "height": 40,
+      "stockLength": 6000,
+      "color": "#22c55e"
+    },
+    {
+      "id": "mat_003",
+      "name": "100x50 Kutu Profil",
+      "code": "KP-10050",
+      "width": 100,
+      "height": 50,
+      "stockLength": 6000,
+      "color": "#ef4444"
+    },
+    {
+      "id": "mat_004",
+      "name": "40x40 Kare Profil",
+      "code": "KRP-4040",
+      "width": 40,
+      "height": 40,
+      "stockLength": 6000,
+      "color": "#eab308"
+    },
+    {
+      "id": "mat_005",
+      "name": "50x50 Kare Profil",
+      "code": "KRP-5050",
+      "width": 50,
+      "height": 50,
+      "stockLength": 6000,
+      "color": "#a855f7"
+    }
+  ]
+}

@@ -32,9 +32,12 @@ router.post('/import', upload.single('file'), (req, res) => {
       return res.status(400).json({ error: 'Dosya gerekli' });
     }
 
+    console.log('Excel import - file received:', req.file.originalname, req.file.size, 'bytes');
     const data = importFromExcel(req.file.buffer);
+    console.log('Excel import - success:', data.cuts.length, 'cuts imported');
     res.json(data);
   } catch (error) {
+    console.error('Excel import error:', error);
     res.status(500).json({ error: 'Excel içe aktarma hatası', message: error.message });
   }
 });
