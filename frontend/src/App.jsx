@@ -180,7 +180,8 @@ function App() {
         startOffset: settings.startOffset || 0,
         endOffset: settings.endOffset || 0,
         profile: settings.profile,
-        cuts
+        cuts,
+        materials
       })
       setResult(data)
     } catch (err) {
@@ -201,7 +202,8 @@ function App() {
         startOffset: settings.startOffset || 0,
         endOffset: settings.endOffset || 0,
         profile: settings.profile,
-        optimizationResult: result
+        optimizationResult: result,
+        projectName: projectName
       })
     } catch (err) {
       setError(err.message || 'PDF oluşturma hatası')
@@ -256,13 +258,11 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
-                  <rect x="2" y="6" width="20" height="12" rx="1" opacity="0.3"/>
-                  <line x1="8" y1="6" x2="8" y2="18" stroke="currentColor" strokeWidth="1" strokeDasharray="2,2"/>
-                  <line x1="14" y1="6" x2="14" y2="18" stroke="currentColor" strokeWidth="1" strokeDasharray="2,2"/>
-                </svg>
-              </div>
+              <img 
+                src="/TurNestLogoNoBackground.svg" 
+                alt="TurNest Logo" 
+                className="w-14 h-14"
+              />
               <div>
                 <h1 className="text-xl font-bold">TurNest</h1>
                 {/* Project Name */}

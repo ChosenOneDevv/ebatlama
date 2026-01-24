@@ -333,9 +333,41 @@ function formatResults(stocks, stockLength) {
 }
 
 /**
- * Ana optimizasyon fonksiyonu
+ * Kesimleri malzeme/profil boyutuna göre gruplar
+ * Her grup ayrı stoktan kesilir
  */
-export function optimizeCuts({ stockLength, kerf, profile, cuts, startOffset = 0, endOffset = 0 }) {
+function groupCutsByMaterial(cuts, defaultProfile, defaultStockLength) {
+  const groups = new Map();
+  
+  cuts.forEach(cut => {
+    // Malzeme bilgisi varsa onu kullan, yoksa genel ayarları kullan
+    const materialKey = cut.materialId || 'default';
+    
+    if (!groups.has(materialKey)) {
+      groups.set(materialKey, {
+        materialId: cut.materialId || null,
+        materialName: cut.materialName || 'Genel',
+        materialColor: cut.materialColor || null,
+        profile: cut.materialId ? {
+          width: cut.materialWidth || defaultProfile.width,
+          height: cut.materialHeight || defaultProfile.height
+        } : defaultProfile,
+        stockLength: cut.materialStockLength || defaultStockLength,
+        cuts: []
+      });
+    }
+    
+    groups.get(materialKey).cuts.push(cut);
+  });
+  
+  return groups;
+}
+
+/**
+ * Ana optimizasyon fonksiyonu
+ * Farklı malzeme/profil boyutları ayrı stoklarda optimize edilir
+ */
+export function optimizeCuts({ stockLength, kerf, profile, cuts, startOffset = 0, endOffset = 0, materials = [] }) {
   if (!cuts || cuts.length === 0) {
     return {
       stocks: [],
@@ -345,29 +377,108 @@ export function optimizeCuts({ stockLength, kerf, profile, cuts, startOffset = 0
         totalUsedLength: 0,
         totalWasteLength: 0,
         overallEfficiency: 0
-      }
+      },
+      materialGroups: []
     };
   }
   
-  const effectiveStockLength = stockLength - startOffset - endOffset;
-  
-  const expandedCuts = expandCuts(cuts, profile);
-  
-  for (const cut of expandedCuts) {
-    if (cut.effectiveLength > effectiveStockLength) {
-      throw new Error(
-        `Kesim uzunluğu (${cut.effectiveLength}mm) kullanılabilir stok uzunluğundan (${effectiveStockLength}mm) büyük olamaz`
-      );
+  // Kesimlere malzeme bilgilerini ekle
+  const cutsWithMaterialInfo = cuts.map(cut => {
+    if (cut.materialId && materials.length > 0) {
+      const material = materials.find(m => m.id === cut.materialId);
+      if (material) {
+        return {
+          ...cut,
+          materialWidth: material.width,
+          materialHeight: material.height,
+          materialStockLength: material.stockLength,
+          materialName: material.name,
+          materialColor: material.color
+        };
+      }
     }
-  }
-  
-  const stocks = firstFitDecreasing(expandedCuts, effectiveStockLength, kerf);
-  
-  stocks.forEach(stock => {
-    stock.kerf = kerf;
-    stock.startOffset = startOffset;
-    stock.endOffset = endOffset;
+    return cut;
   });
   
-  return formatResults(stocks, stockLength);
+  // Kesimleri malzeme/profil boyutuna göre grupla
+  const materialGroups = groupCutsByMaterial(cutsWithMaterialInfo, profile, stockLength);
+  
+  let allStocks = [];
+  let stockIndexOffset = 0;
+  const groupResults = [];
+  
+  // Her grup için ayrı optimizasyon yap
+  for (const [materialKey, group] of materialGroups) {
+    const groupProfile = group.profile;
+    const groupStockLength = group.stockLength;
+    const effectiveStockLength = groupStockLength - startOffset - endOffset;
+    
+    const expandedCuts = expandCuts(group.cuts, groupProfile);
+    
+    // Kesim uzunluğu kontrolü
+    for (const cut of expandedCuts) {
+      if (cut.effectiveLength > effectiveStockLength) {
+        throw new Error(
+          `Kesim uzunluğu (${cut.effectiveLength}mm) kullanılabilir stok uzunluğundan (${effectiveStockLength}mm) büyük olamaz (${group.materialName})`
+        );
+      }
+    }
+    
+    const stocks = firstFitDecreasing(expandedCuts, effectiveStockLength, kerf);
+    
+    // Stok bilgilerine malzeme ve profil bilgilerini ekle
+    stocks.forEach(stock => {
+      stock.kerf = kerf;
+      stock.startOffset = startOffset;
+      stock.endOffset = endOffset;
+      stock.materialId = group.materialId;
+      stock.materialName = group.materialName;
+      stock.materialColor = group.materialColor;
+      stock.profile = groupProfile;
+      stock.stockLength = groupStockLength;
+    });
+    
+    // Grup sonuçlarını formatla
+    const groupResult = formatResults(stocks, groupStockLength);
+    
+    // Stok indekslerini güncelle (global sıralama için)
+    groupResult.stocks.forEach(stock => {
+      stock.stockIndex = stockIndexOffset + stock.stockIndex;
+      stock.materialId = group.materialId;
+      stock.materialName = group.materialName;
+      stock.materialColor = group.materialColor;
+      stock.profile = groupProfile;
+      stock.groupStockLength = groupStockLength;
+    });
+    
+    stockIndexOffset += groupResult.stocks.length;
+    allStocks = allStocks.concat(groupResult.stocks);
+    
+    groupResults.push({
+      materialId: group.materialId,
+      materialName: group.materialName,
+      materialColor: group.materialColor,
+      profile: groupProfile,
+      stockLength: groupStockLength,
+      summary: groupResult.summary
+    });
+  }
+  
+  // Genel özet hesapla
+  const totalUsed = allStocks.reduce((sum, s) => sum + s.usedLength, 0);
+  const totalWaste = allStocks.reduce((sum, s) => sum + s.wasteLength, 0);
+  const totalStockLength = allStocks.reduce((sum, s) => sum + (s.groupStockLength || stockLength), 0);
+  const overallEfficiency = totalStockLength > 0 ? ((totalUsed / totalStockLength) * 100).toFixed(1) : 0;
+  
+  return {
+    stocks: allStocks,
+    summary: {
+      totalStocks: allStocks.length,
+      totalCuts: allStocks.reduce((sum, s) => sum + s.cuts.length, 0),
+      totalUsedLength: Math.round(totalUsed * 100) / 100,
+      totalWasteLength: Math.round(totalWaste * 100) / 100,
+      overallEfficiency: Number(overallEfficiency)
+    },
+    materialGroups: groupResults
+  };
 }

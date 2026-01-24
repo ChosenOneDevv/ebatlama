@@ -531,7 +531,7 @@ function drawCutList(doc, cuts, startY, pageWidth) {
 /**
  * PDF oluşturur
  */
-export async function generatePDF({ stockLength, kerf, profile, stocks, summary, startOffset = 0, endOffset = 0 }) {
+export async function generatePDF({ stockLength, kerf, profile, stocks, summary, startOffset = 0, endOffset = 0, projectName = null }) {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ 
@@ -551,41 +551,54 @@ export async function generatePDF({ stockLength, kerf, profile, stocks, summary,
       
       const pageWidth = doc.page.width;
       
+      // Proje ismi varsa büyük başlık olarak göster
+      let headerY = 50;
+      if (projectName) {
+        doc.font('Roboto-Bold')
+           .fontSize(22)
+           .fillColor('#1a365d')
+           .text(projectName, 50, headerY, { align: 'center', width: pageWidth - 100 });
+        headerY += 30;
+      }
+      
       doc.font('Roboto-Bold')
-         .fontSize(18)
+         .fontSize(16)
          .fillColor('#2c3e50')
-         .text('Profil Kesim Planı', 50, 50);
+         .text('Profil Kesim Planı', 50, headerY);
       
       doc.font('Roboto');
       
       doc.fontSize(10)
          .fillColor('#7f8c8d')
-         .text(`Oluşturulma: ${new Date().toLocaleString('tr-TR')}`, 50, 75);
+         .text(`Oluşturulma: ${new Date().toLocaleString('tr-TR')}`, 50, headerY + 20);
+      
+      // Proje ismi varsa Y pozisyonlarını kaydır
+      const baseY = projectName ? 130 : 100;
       
       doc.fontSize(10)
          .fillColor('#000')
-         .text(`Stok Uzunluğu: ${stockLength}mm`, 50, 100)
-         .text(`Testere Payı: ${kerf}mm`, 200, 100)
-         .text(`Profil: ${profile.width}x${profile.height}mm`, 350, 100);
+         .text(`Stok Uzunluğu: ${stockLength}mm`, 50, baseY)
+         .text(`Testere Payı: ${kerf}mm`, 200, baseY)
+         .text(`Profil: ${profile.width}x${profile.height}mm`, 350, baseY);
       
-      doc.moveTo(50, 120).lineTo(pageWidth - 50, 120).stroke('#ccc');
+      doc.moveTo(50, baseY + 20).lineTo(pageWidth - 50, baseY + 20).stroke('#ccc');
       
       doc.fontSize(12)
          .fillColor('#2c3e50')
-         .text('Özet', 50, 135);
+         .text('Özet', 50, baseY + 35);
       
       doc.fontSize(10)
          .fillColor('#000')
-         .text(`Toplam Stok: ${summary.totalStocks} adet`, 50, 155)
-         .text(`Toplam Kesim: ${summary.totalCuts} adet`, 200, 155)
-         .text(`Genel Verim: %${summary.overallEfficiency}`, 350, 155);
+         .text(`Toplam Stok: ${summary.totalStocks} adet`, 50, baseY + 55)
+         .text(`Toplam Kesim: ${summary.totalCuts} adet`, 200, baseY + 55)
+         .text(`Genel Verim: %${summary.overallEfficiency}`, 350, baseY + 55);
       
-      doc.text(`Kullanılan: ${summary.totalUsedLength}mm`, 50, 170)
-         .text(`Fire: ${summary.totalWasteLength}mm`, 200, 170);
+      doc.text(`Kullanılan: ${summary.totalUsedLength}mm`, 50, baseY + 70)
+         .text(`Fire: ${summary.totalWasteLength}mm`, 200, baseY + 70);
       
-      doc.moveTo(50, 190).lineTo(pageWidth - 50, 190).stroke('#ccc');
+      doc.moveTo(50, baseY + 90).lineTo(pageWidth - 50, baseY + 90).stroke('#ccc');
       
-      let currentY = 210;
+      let currentY = baseY + 110;
       const maxY = doc.page.height - 100;
       
       const groupedStocks = groupIdenticalStocks(stocks);

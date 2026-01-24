@@ -36,6 +36,9 @@ RUN npm ci --only=production
 # Copy backend source
 COPY backend/src ./src
 
+# Copy backend data files (materials, projects)
+COPY backend/data ./data
+
 # Copy frontend build from builder stage to public folder
 COPY --from=frontend-builder /app/frontend/dist ./public
 

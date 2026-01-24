@@ -177,8 +177,25 @@ function StockVisual({ stock, stockLength, startOffset = 0, endOffset = 0 }) {
           <span className="bg-gray-800 text-white text-sm font-bold px-3 py-1 rounded">
             Stok #{stock.stockIndex}
           </span>
+          {/* Malzeme bilgisi */}
+          {stock.materialName && stock.materialName !== 'Genel' && (
+            <span 
+              className="text-sm font-medium px-2 py-0.5 rounded"
+              style={{ 
+                backgroundColor: stock.materialColor ? `${stock.materialColor}20` : '#e5e7eb',
+                color: stock.materialColor || '#374151'
+              }}
+            >
+              {stock.materialName}
+              {stock.profile && (
+                <span className="text-xs ml-1 opacity-70">
+                  ({stock.profile.width}x{stock.profile.height})
+                </span>
+              )}
+            </span>
+          )}
           <span className="text-sm text-gray-600">
-            {stockLength} mm
+            {stock.groupStockLength || stockLength} mm
           </span>
         </div>
         <div className="flex items-center gap-4 text-sm">

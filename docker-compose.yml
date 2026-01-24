@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   turnest:
     build:
@@ -8,6 +6,8 @@ services:
     container_name: turnest-app
     ports:
       - "3000:3000"
+    volumes:
+      - turnest-data:/app/data
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -38,3 +38,7 @@ services:
     environment:
       - NODE_ENV=development
     command: sh -c "cd /app/backend && npm run dev & cd /app/frontend && npm run dev -- --host"
+
+volumes:
+  turnest-data:
+    name: turnest-data
