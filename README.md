@@ -22,7 +22,7 @@
 Pull and run TurNest with a single command:
 
 ```bash
-docker pull chosenonedevv/turnest:latest
+docker pull ch0s3n/turnest:latest
 docker run -p 3000:3000 chosenonedevv/turnest
 ```
 
@@ -34,7 +34,7 @@ Then open **http://localhost:3000** in your browser.
 version: '3.8'
 services:
   turnest:
-    image: chosenonedevv/turnest:latest
+    image: ch0s3n/turnest:latest
     ports:
       - "3000:3000"
     restart: unless-stopped
