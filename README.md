@@ -23,7 +23,7 @@ Pull and run TurNest with a single command:
 
 ```bash
 docker pull ch0s3n/turnest:latest
-docker run -p 3000:3000 chosenonedevv/turnest
+docker run -p 3000:3000 ch0s3n/turnest
 ```
 
 Then open **http://localhost:3000** in your browser.
